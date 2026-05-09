@@ -1,0 +1,2 @@
+1 https://astrogreg.com/convert_ra_dec_to_alt_az.html
+2 https://aa.usno.navy.mil/faq/GAST

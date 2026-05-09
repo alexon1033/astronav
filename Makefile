@@ -1,8 +1,8 @@
 CC = gcc
-CFLAGS =
+CFLAGS = -Wall -Wextra
 LDFLAGS = -lm
-TARGET = starlocate
-SRC = main.c catalog.c
+TARGET = localstar
+SRC = visible.c catalog.c
 
 all: $(TARGET)
 

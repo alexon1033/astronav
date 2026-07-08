@@ -1,4 +1,4 @@
-#define _XOPEN_SOURCE
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,14 +19,20 @@ struct altaz {
 	double az;
 };
 
+struct degminsec {
+	int deg;
+	int min;
+	int sec;
+};
+
 double UTC_to_GMST(time_t time_UTC) {
 	/*
 	 Function for estimating GMST using a unix timestamp of time_t. Source {2}
 	 */
 
 	// Terrerstrial time from UTC. 
-	time_t time_TAI = time_UTC + 37;
-	time_t time_TT = time_TAI + 32.184;
+	double time_TAI = (double)time_UTC + 37;
+	double time_TT = time_TAI + 32.184;
 
 	// Set midNIGHT jan 1 2000
 	struct tm time_2000_tm = {
@@ -38,12 +44,12 @@ double UTC_to_GMST(time_t time_UTC) {
     		.tm_year = 100   // years since 1900, so 2000
     	// remaining fields default to 0
 	};
-	time_t time_2000_UTC = mktime(&time_2000_tm);
 
+	time_t time_2000_UTC = timegm(&time_2000_tm);
 
 	// Compute julian date UT1 (assumed same as UTC, err ~1 sec) using year 2000 epoch
 	double julian_2000 = 2451544.500000;
-	double julian_UT1 =  difftime(time_UTC, time_2000_UTC)/(60*60*24) + julian_2000;
+	double julian_UT1 =  (time_TT - (double)time_2000_UTC)/(60*60*24) + julian_2000;
 
 	// Same for Terrestrial Time
 	double julian_TT = difftime(time_TT, time_2000_UTC)/(60*60*24) + julian_2000;
@@ -87,19 +93,38 @@ struct altaz RA_DEC_to_Alt_Az(time_t time_UTC, STAR *star, LOCATION *location) {
 	double lat = location->lat*2*PI/360;
 
 	double GMST = UTC_to_GMST(time_UTC);
-	double LST = fmod((GMST*360/24 + lon), 360.0); // Local Sidereal time
+	double LST = fmod((GMST*(2*PI)/24 + lon), 2*PI); // Local Sidereal time
 	double HA = LST - RA; // Hour angle
 	
 	double altitude = asin(sin(lat)*sin(DEC) + cos(lat)*cos(DEC)*cos(HA));
 	double azimuth = atan2(sin(HA), cos(HA)*sin(lat) - tan(DEC)*cos(lat));
 
 	altitude = altitude*360/(2*PI);
-	azimuth = (azimuth + PI)*360/(2*PI);
+	azimuth = azimuth*360/(2*PI);
+	azimuth = azimuth + 180;
 
 	struct altaz sky_pos = {altitude, azimuth};
 
 	return sky_pos;
 };
+
+struct degminsec deg_to_dms(double angle) {
+	// Function for turning float in degrees to struct of astronomical degrees-minutes-seconds notation.
+	
+	double remainder;
+
+	//truncate using explicit cast. Get remainder with fmod.
+	int degrees = (int)angle;
+	remainder = 60*fmod(angle, 1);
+	
+	int minutes = (int)remainder;
+	remainder = 60*fmod(remainder, 1);
+
+	int seconds = (int)remainder;
+
+	struct degminsec result = {degrees, minutes, seconds};
+	return result;
+}
 
 int main(int argc, char *argv[]) {
 	time_t current_time = 0;
@@ -108,31 +133,35 @@ int main(int argc, char *argv[]) {
 	for (int i = 0; i<argc; i++) {
 		if (strcmp(argv[i], "-t") == 0) {
 			if (i+1 >= argc) {
-				printf("Incorrect Usage: t flag requires value\n");
+				printf("Incorrect Usage: t flag requires value of form: YYYY-mm-dd-HH:MM(:SS)\n");
 				return 1;
 			};
 
 			struct tm time_tm = {0}; 
-			char *strp_return_ptr = strptime(argv[i+1], "%Y-%m-%d-%H:%M", &time_tm);
+			char *strp_return_ptr = strptime(argv[i+1], "%Y-%m-%d-%H:%M:%S", &time_tm);
 			time_tm.tm_isdst = -1;
 
 			if (strp_return_ptr == NULL) {
-				printf("Incorrect Usage: Use YYYY-mm-dd-HH:MM time format\n");
-				return 1;
+				char *strp_return_ptr = strptime(argv[i+1], "%Y-%m-%d-%H:%M:%S", &time_tm);
+				time_tm.tm_isdst = -1;
+
+				if (strp_return_ptr == NULL) {
+					printf("Incorrect Usage: Use YYYY-mm-dd-HH:MM(:SS) time format\n");
+					return 1;
+				}
 			}
-			else {
-				current_time = mktime(&time_tm);
-			};
+			
+			current_time = mktime(&time_tm);
 		}
 	};
 
 	if (current_time == 0) {
 		current_time = time(NULL);
-		printf("Using current system time\n");
+		// printf("Using current system time\n");
 	};
 
 
-	LOCATION location = {-0.1276, 51.5072};
+	LOCATION location = {0.972261, 51.16834};
 
 	char starid[20]; 
 	strcpy(starid, argv[argc-1]); //argv[argc-1] is last command line argument from OS shell
@@ -144,7 +173,7 @@ int main(int argc, char *argv[]) {
 	};
 
 	// Check for name in catalog
-	for (int i = 0; i<=STAR_NUMBER; i++) {
+	for (int i = 0; i<STAR_NUMBER; i++) {
 		if (strcmp(catalog[i].name, starid) == 0) {
 			starno = i;
 		};
@@ -169,10 +198,28 @@ int main(int argc, char *argv[]) {
 	};
 
 	STAR star = catalog[starno];
+	// Conversion to local coordinates
 	struct altaz sky_pos = RA_DEC_to_Alt_Az(current_time, &star, &location);
 
-	printf("Star: %s\nAltitude: %f\nAzimuth: %f\n", catalog[starno].name, sky_pos.alt, sky_pos.az);
-		
+	// conversion to dms for readability
+	struct degminsec altitude = deg_to_dms(sky_pos.alt);
+	struct degminsec azimuth = deg_to_dms(sky_pos.az);
+
+
+	printf("Star: %s\n", catalog[starno].name);
+	printf("Altitude: %d\u00B0 %d\u2032 %d\u2033\n", altitude.deg, altitude.min, altitude.sec);	
+	printf("Azimuth: %d\u00B0 %d\u2032 %d\u2033\n", azimuth.deg, azimuth.min, azimuth.sec);
+
+	
+	if (sky_pos.alt > 15) {
+		printf("Visible: Yes\n");
+	} else if (sky_pos.alt < 0) {
+		printf("Visible: No\n");
+	} else {
+		printf("Visiblity: Poor\n");
+	};
+
+
 	return 0;
 
 };

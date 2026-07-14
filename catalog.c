@@ -1,4 +1,5 @@
 #include "catalog.h"
+#include "types.h"
 
 
 const STAR catalog[STAR_NUMBER] = {
@@ -39,8 +40,8 @@ const STAR catalog[STAR_NUMBER] = {
 	{"alkaid", 206.885157, 49.313267},
 	{"hadar", 210.955856, -59.626965},
 	{"menkent", 211.670615, -35.630045},
-	{"rigil-kentaurus", 219.902058, -59.166007},
 	{"arcturus", 213.915300, 19.182409},
+	{"rigil-kentaurus", 219.902058, -59.166007},
 	{"zubenelgenubi", 222.719638, -15.958223},
 	{"kochab", 222.676358, 74.155504},
 	{"alphecca", 233.671952, 26.714685},

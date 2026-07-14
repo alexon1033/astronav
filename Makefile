@@ -1,13 +1,12 @@
 CC = gcc
-CFLAGS = -Wall -Wextra
-LDFLAGS = -lm
-TARGET = localstar
-SRC = visible.c catalog.c
+CFLAGS = 
+LDFLAGS = -lgsl -lgslcblas -lm
+SRC = main.c catalog.c astro_math.c locate.c
 
-all: $(TARGET)
 
-$(TARGET): $(SRC)
-	$(CC) $(CFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
+
+locate: $(SRC)
+	$(CC) $(CFLAGS) $(SRC) -o locate $(LDFLAGS)
 
 clean:
 	rm -f $(TARGET)

@@ -1,13 +1,9 @@
 #ifndef STARCATALOG_H
 #define STARCATALOG_H
 
-typedef struct {
-	char name[20];
-	double RA;
-	double DEC;
-} STAR;
-
 #define STAR_NUMBER 58
+
+#include "types.h"
 
 extern const STAR catalog[STAR_NUMBER];
 
